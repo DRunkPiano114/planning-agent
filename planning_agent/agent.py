@@ -9,7 +9,7 @@ This module implements the main planning agent workflow:
 """
 
 import os
-from typing import Dict, List, Optional
+from typing import List, Optional
 from dataclasses import dataclass
 
 
@@ -293,7 +293,9 @@ Estimated implementation time: 30 minutes
         """
         for file in files:
             # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(file.path) or ".", exist_ok=True)
+            dir_path = os.path.dirname(file.path)
+            if dir_path:
+                os.makedirs(dir_path, exist_ok=True)
             
             # Check if file exists
             if os.path.exists(file.path) and not overwrite:
