@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from planning_agent.agent import PlanningAgent
+from typing import Optional
 
 
 console = Console()
@@ -32,6 +33,29 @@ def cli():
     help="AI model provider to use",
 )
 @click.option(
+    "--prompt-file",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    default=None,
+    help="Optional file path whose content will be used as the system prompt (easy prompt iteration).",
+)
+@click.option(
+    "--openai-model",
+    default=None,
+    help="OpenAI model override (defaults to env OPENAI_MODEL or gpt-4o-mini).",
+)
+@click.option(
+    "--openai-temperature",
+    type=float,
+    default=0.2,
+    show_default=True,
+    help="OpenAI temperature.",
+)
+@click.option(
+    "--anthropic-model",
+    default=None,
+    help="Anthropic model override (defaults to env ANTHROPIC_MODEL).",
+)
+@click.option(
     "--output-dir",
     "-o",
     default=".",
@@ -48,7 +72,17 @@ def cli():
     is_flag=True,
     help="Overwrite existing files",
 )
-def run(requirement: str, model: str, output_dir: str, auto_approve: bool, overwrite: bool):
+def run(
+    requirement: str,
+    model: str,
+    prompt_file: Optional[str],
+    openai_model: Optional[str],
+    openai_temperature: float,
+    anthropic_model: Optional[str],
+    output_dir: str,
+    auto_approve: bool,
+    overwrite: bool,
+):
     """
     Run the planning agent with a requirement.
     
@@ -57,7 +91,13 @@ def run(requirement: str, model: str, output_dir: str, auto_approve: bool, overw
     console.print("\n[bold blue]🤖 Planning Agent[/bold blue]\n")
     
     # Initialize agent
-    agent = PlanningAgent(model_provider=model)
+    agent = PlanningAgent(
+        model_provider=model,
+        prompt_file=prompt_file,
+        openai_model=openai_model,
+        openai_temperature=openai_temperature,
+        anthropic_model=anthropic_model,
+    )
     
     # Step 1: Generate plan
     console.print("[bold]Step 1: Generating plan...[/bold]")
@@ -140,7 +180,37 @@ def run(requirement: str, model: str, output_dir: str, auto_approve: bool, overw
     default="mock",
     help="AI model provider to use",
 )
-def plan(requirement: str, model: str):
+@click.option(
+    "--prompt-file",
+    type=click.Path(exists=True, dir_okay=False, readable=True),
+    default=None,
+    help="Optional file path whose content will be used as the system prompt (easy prompt iteration).",
+)
+@click.option(
+    "--openai-model",
+    default=None,
+    help="OpenAI model override (defaults to env OPENAI_MODEL or gpt-4o-mini).",
+)
+@click.option(
+    "--openai-temperature",
+    type=float,
+    default=0.2,
+    show_default=True,
+    help="OpenAI temperature.",
+)
+@click.option(
+    "--anthropic-model",
+    default=None,
+    help="Anthropic model override (defaults to env ANTHROPIC_MODEL).",
+)
+def plan(
+    requirement: str,
+    model: str,
+    prompt_file: Optional[str],
+    openai_model: Optional[str],
+    openai_temperature: float,
+    anthropic_model: Optional[str],
+):
     """
     Generate a plan without implementing it.
     
@@ -148,7 +218,13 @@ def plan(requirement: str, model: str):
     """
     console.print("\n[bold blue]🤖 Planning Agent - Plan Only Mode[/bold blue]\n")
     
-    agent = PlanningAgent(model_provider=model)
+    agent = PlanningAgent(
+        model_provider=model,
+        prompt_file=prompt_file,
+        openai_model=openai_model,
+        openai_temperature=openai_temperature,
+        anthropic_model=anthropic_model,
+    )
     
     console.print("[bold]Generating plan...[/bold]")
     with Progress(

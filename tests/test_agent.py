@@ -6,6 +6,7 @@ import os
 import tempfile
 import pytest
 from planning_agent.agent import PlanningAgent, FileToGenerate
+from planning_agent.providers.openai_provider import OpenAIPlanProvider
 
 
 class TestPlanningAgent:
@@ -206,3 +207,46 @@ class TestFileToGenerate:
         assert file.path == "/tmp/test.py"
         assert file.content == "print('hello')"
         assert file.description == "Test file"
+
+
+class TestOpenAIPlanProvider:
+    def test_generate_plan_with_injected_responses_client(self):
+        calls = {}
+
+        class FakeResponse:
+            output_text = "# Implementation Plan\n\n## Files\n- `a.py`\n\n## Steps\n1. Do it\n\n## Open Questions\n- None"
+
+        class FakeResponses:
+            def create(self, **kwargs):
+                calls["kwargs"] = kwargs
+                return FakeResponse()
+
+        class FakeClient:
+            responses = FakeResponses()
+
+        provider = OpenAIPlanProvider(api_key="test", model="test-model", client=FakeClient())
+        plan = provider.generate_plan("Build X")
+
+        assert "Implementation Plan" in plan
+        assert "Build X" in calls["kwargs"]["input"][1]["content"]
+
+    def test_generate_plan_falls_back_to_chat_completions(self):
+        class FakeChoiceMsg:
+            content = "# Implementation Plan\n\n## Files\n- `b.py`\n\n## Steps\n1. Do it\n\n## Open Questions\n- None"
+
+        class FakeChoice:
+            message = FakeChoiceMsg()
+
+        class FakeChatCompletions:
+            def create(self, **kwargs):
+                return type("Resp", (), {"choices": [FakeChoice()]})()
+
+        class FakeChat:
+            completions = FakeChatCompletions()
+
+        class FakeClient:
+            chat = FakeChat()
+
+        provider = OpenAIPlanProvider(api_key="test", model="test-model", client=FakeClient())
+        plan = provider.generate_plan("Build Y")
+        assert "Implementation Plan" in plan

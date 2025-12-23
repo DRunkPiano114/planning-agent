@@ -9,8 +9,10 @@ This module implements the main planning agent workflow:
 """
 
 import os
-from typing import List, Optional
+from typing import Any, List, Optional
 from dataclasses import dataclass
+
+from planning_agent.providers import AnthropicPlanProvider, MockPlanProvider, OpenAIPlanProvider, PlanProvider
 
 
 @dataclass
@@ -32,16 +34,70 @@ class PlanningAgent:
     4. Implements files based on the plan
     """
     
-    def __init__(self, model_provider: str = "mock"):
+    def __init__(
+        self,
+        model_provider: str = "mock",
+        *,
+        prompt_file: Optional[str] = None,
+        system_prompt: Optional[str] = None,
+        openai_model: Optional[str] = None,
+        openai_temperature: float = 0.2,
+        openai_client: Any = None,
+        anthropic_model: Optional[str] = None,
+    ):
         """
         Initialize the Planning Agent.
         
         Args:
             model_provider: The AI model provider to use ("openai", "anthropic", or "mock")
+            prompt_file: Optional file path to a prompt override (string content used as system prompt)
+            system_prompt: Optional system prompt override (ignored if prompt_file is provided)
+            openai_model: Optional OpenAI model override (defaults to env OPENAI_MODEL or gpt-4o-mini)
+            openai_temperature: OpenAI temperature
+            openai_client: Optional injected OpenAI client (useful for tests)
+            anthropic_model: Optional Anthropic model override (defaults to env ANTHROPIC_MODEL)
         """
         self.model_provider = model_provider
         self.current_plan = None
         self.plan_approved = False
+        self.plan_provider: PlanProvider = self._build_plan_provider(
+            model_provider=model_provider,
+            prompt_file=prompt_file,
+            system_prompt=system_prompt,
+            openai_model=openai_model,
+            openai_temperature=openai_temperature,
+            openai_client=openai_client,
+            anthropic_model=anthropic_model,
+        )
+
+    def _build_plan_provider(
+        self,
+        *,
+        model_provider: str,
+        prompt_file: Optional[str],
+        system_prompt: Optional[str],
+        openai_model: Optional[str],
+        openai_temperature: float,
+        openai_client: Any,
+        anthropic_model: Optional[str],
+    ) -> PlanProvider:
+        if model_provider == "mock":
+            return MockPlanProvider()
+        if model_provider == "openai":
+            return OpenAIPlanProvider(
+                model=openai_model,
+                temperature=openai_temperature,
+                prompt_file=prompt_file,
+                system_prompt=system_prompt,
+                client=openai_client,
+            )
+        if model_provider == "anthropic":
+            return AnthropicPlanProvider(
+                model=anthropic_model,
+                prompt_file=prompt_file,
+                system_prompt=system_prompt,
+            )
+        raise ValueError(f"Unknown model provider: {model_provider}")
         
     def generate_plan(self, requirement: str) -> str:
         """
@@ -53,115 +109,10 @@ class PlanningAgent:
         Returns:
             A Markdown-formatted plan
         """
-        # For now, use a simple template-based approach
-        # In a full implementation, this would call an LLM
-        plan = self._generate_plan_with_llm(requirement)
+        plan = self.plan_provider.generate_plan(requirement)
         self.current_plan = plan
         self.plan_approved = False
         return plan
-    
-    def _generate_plan_with_llm(self, requirement: str) -> str:
-        """
-        Generate plan using the configured LLM provider.
-        
-        Args:
-            requirement: The user's requirement
-            
-        Returns:
-            Markdown-formatted plan
-        """
-        if self.model_provider == "mock":
-            return self._generate_mock_plan(requirement)
-        elif self.model_provider == "openai":
-            return self._generate_plan_openai(requirement)
-        elif self.model_provider == "anthropic":
-            return self._generate_plan_anthropic(requirement)
-        else:
-            raise ValueError(f"Unknown model provider: {self.model_provider}")
-    
-    def _generate_mock_plan(self, requirement: str) -> str:
-        """Generate a mock plan for testing purposes."""
-        return f"""# Implementation Plan
-
-## Requirement
-{requirement}
-
-## Proposed Solution
-
-### Files to Create
-1. `main.py` - Main application entry point
-2. `utils.py` - Utility functions
-3. `README.md` - Documentation
-
-### Implementation Steps
-1. Set up project structure
-2. Implement core functionality
-3. Add error handling
-4. Write documentation
-5. Test the implementation
-
-### Dependencies
-- No external dependencies required for basic implementation
-
-## Timeline
-Estimated implementation time: 30 minutes
-"""
-    
-    def _generate_plan_openai(self, requirement: str) -> str:
-        """Generate plan using OpenAI API."""
-        try:
-            import openai
-            
-            api_key = os.getenv("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY environment variable not set")
-            
-            client = openai.OpenAI(api_key=api_key)
-            
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a helpful coding assistant. Generate a detailed Markdown plan for implementing the user's requirement. Include files to create, implementation steps, and dependencies."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"Create a detailed implementation plan for: {requirement}"
-                    }
-                ],
-                temperature=0.7,
-            )
-            
-            return response.choices[0].message.content
-        except ImportError:
-            raise ImportError("openai package not installed. Install with: pip install openai")
-    
-    def _generate_plan_anthropic(self, requirement: str) -> str:
-        """Generate plan using Anthropic Claude API."""
-        try:
-            import anthropic
-            
-            api_key = os.getenv("ANTHROPIC_API_KEY")
-            if not api_key:
-                raise ValueError("ANTHROPIC_API_KEY environment variable not set")
-            
-            client = anthropic.Anthropic(api_key=api_key)
-            
-            message = client.messages.create(
-                model="claude-3-sonnet-20240229",
-                max_tokens=2048,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"You are a helpful coding assistant. Generate a detailed Markdown plan for implementing the following requirement. Include files to create, implementation steps, and dependencies.\n\nRequirement: {requirement}"
-                    }
-                ]
-            )
-            
-            return message.content[0].text
-        except ImportError:
-            raise ImportError("anthropic package not installed. Install with: pip install anthropic")
     
     def approve_plan(self) -> None:
         """Mark the current plan as approved."""

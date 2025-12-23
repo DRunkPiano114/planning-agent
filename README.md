@@ -55,8 +55,12 @@ planning-agent run "Create a TODO list application" --model mock
 
 ```bash
 export OPENAI_API_KEY=your_api_key
-planning-agent run "Create a web scraper" --model openai
+planning-agent plan "Create a web scraper" --model openai
 ```
+
+Notes:
+- The plan output is **Markdown** and is printed to the terminal (it is **not** written to a `plans/` folder).
+- You can override the model with `--openai-model` or via `OPENAI_MODEL`.
 
 #### Anthropic Claude
 
@@ -91,6 +95,22 @@ Generate a plan without implementing it:
 
 ```bash
 planning-agent plan "Create a machine learning pipeline"
+```
+
+### Prompt Iteration
+
+You can override the system prompt from a file (easy to iterate without code changes):
+
+```bash
+planning-agent plan "Build a TODO app" --model openai --prompt-file ./my_prompt.txt
+```
+
+### Model Overrides
+
+```bash
+export OPENAI_API_KEY=your_api_key
+export OPENAI_MODEL=gpt-4o-mini
+planning-agent plan "Create a web scraper" --model openai
 ```
 
 ## Python API
